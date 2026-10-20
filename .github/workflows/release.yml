@@ -1,0 +1,93 @@
+# Builds the NixTV installer ISOs (x86_64 and aarch64, each on a native runner).
+#  - Push a tag like v0.1.0: the ISOs are published as a GitHub release.
+#  - Run it by hand (Actions → Release → Run workflow): the ISOs are kept as
+#    workflow artifacts only, for testing.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  iso:
+    name: ISO (${{ matrix.system }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - system: x86_64-linux
+            runner: ubuntu-latest
+          - system: aarch64-linux
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Build the ISO
+        run: nix build --print-build-logs .#packages.${{ matrix.system }}.iso
+
+      - name: Name it after the version
+        run: |
+          version=${GITHUB_REF_NAME}
+          [ "$GITHUB_REF_TYPE" = tag ] || version=$(git rev-parse --short HEAD)
+          mkdir dist
+          cp result/iso/*.iso "dist/nixtv-${version}-${{ matrix.system }}.iso"
+          cd dist && sha256sum -- *.iso > "nixtv-${version}-${{ matrix.system }}.iso.sha256"
+          ls -lh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: iso-${{ matrix.system }}
+          path: dist/*
+          # The ISOs are already compressed.
+          compression-level: 0
+          retention-days: 14
+
+  release:
+    name: GitHub release
+    if: github.ref_type == 'tag'
+    needs: iso
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Write the release notes
+        run: |
+          rev=$(jq -r .nodes.nixpkgs.locked.rev flake.lock)
+          cat > notes.md <<EOF
+          NixTV is early in development and hasn't been tested thoroughly; see the README.
+
+          **Install:** write the ISO for your CPU (\`x86_64\` for most PCs) to a USB stick,
+          boot it, get online (\`nmtui\` for Wi-Fi) and run \`sudo nixtv-install\`. The ISO is
+          small: everything else downloads during the install.
+
+          Check the download with \`sha256sum -c nixtv-*.iso.sha256\`.
+
+          **Source:** the ISOs contain free software from NixOS, each under its own license,
+          built from nixpkgs commit [\`${rev:0:12}\`](https://github.com/NixOS/nixpkgs/tree/$rev).
+          Its source, and the source for everything else in the ISO, is available there.
+          EOF
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          # v0.x and tags like v1.0.0-rc1 are marked as pre-releases.
+          prerelease: ${{ startsWith(github.ref_name, 'v0.') || contains(github.ref_name, '-') }}
+          body_path: notes.md
