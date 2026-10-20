@@ -2,6 +2,8 @@
 #  - Push a tag like v0.1.0: the ISOs are published as a GitHub release.
 #  - Run it by hand (Actions → Release → Run workflow): the ISOs are kept as
 #    workflow artifacts only, for testing.
+# ISOs are named nixtv-<version>-<arch>.iso (nixtv-0.1.0-x86_64.iso), or
+# nixtv-dev-<commit>-<arch>.iso for a run by hand.
 name: Release
 
 on:
@@ -14,14 +16,16 @@ permissions:
 
 jobs:
   iso:
-    name: ISO (${{ matrix.system }})
+    name: ISO (${{ matrix.arch }})
     strategy:
       fail-fast: false
       matrix:
         include:
-          - system: x86_64-linux
+          - arch: x86_64
+            system: x86_64-linux
             runner: ubuntu-latest
-          - system: aarch64-linux
+          - arch: aarch64
+            system: aarch64-linux
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     steps:
@@ -36,20 +40,24 @@ jobs:
         run: nix build --print-build-logs .#packages.${{ matrix.system }}.iso
 
       - name: Name it after the version
+        id: name
         run: |
-          version=${GITHUB_REF_NAME}
-          [ "$GITHUB_REF_TYPE" = tag ] || version=$(git rev-parse --short HEAD)
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version=${GITHUB_REF_NAME#v} # v0.1.0 -> 0.1.0
+          else
+            version=dev-$(git rev-parse --short HEAD)
+          fi
+          iso="nixtv-${version}-${{ matrix.arch }}.iso"
           mkdir dist
-          cp result/iso/*.iso "dist/nixtv-${version}-${{ matrix.system }}.iso"
-          cd dist && sha256sum -- *.iso > "nixtv-${version}-${{ matrix.system }}.iso.sha256"
-          ls -lh
+          cp result/iso/*.iso "dist/$iso"
+          echo "iso=$iso" >> "$GITHUB_OUTPUT"
+          ls -lh dist
 
+      # Uploaded as the .iso itself (no zip), so it downloads as one.
       - uses: actions/upload-artifact@v7
         with:
-          name: iso-${{ matrix.system }}
-          path: dist/*
-          # The ISOs are already compressed.
-          compression-level: 0
+          path: dist/${{ steps.name.outputs.iso }}
+          archive: false
           retention-days: 14
 
   release:
@@ -64,8 +72,12 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
+          pattern: nixtv-*.iso
           path: dist
           merge-multiple: true
+
+      - name: Write the checksums
+        run: cd dist && sha256sum -- *.iso | tee SHA256SUMS
 
       - name: Write the release notes
         run: |
@@ -77,7 +89,7 @@ jobs:
           boot it, get online (\`nmtui\` for Wi-Fi) and run \`sudo nixtv-install\`. The ISO is
           small: everything else downloads during the install.
 
-          Check the download with \`sha256sum -c nixtv-*.iso.sha256\`.
+          Check the download with \`sha256sum -c SHA256SUMS --ignore-missing\`.
 
           **Source:** the ISOs contain free software from NixOS, each under its own license,
           built from nixpkgs commit [\`${rev:0:12}\`](https://github.com/NixOS/nixpkgs/tree/$rev).

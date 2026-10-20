@@ -40,7 +40,8 @@ in
 {
   imports = [ (modulesPath + "/installer/cd-dvd/installation-cd-minimal.nix") ];
 
-  image.baseName = lib.mkForce "nixtv-${self.shortRev or "dirty"}-${pkgs.stdenv.hostPlatform.system}";
+  # Same pattern as the release ISOs: nixtv-<version>-<arch>.iso.
+  image.baseName = lib.mkForce "nixtv-dev-${self.shortRev or "dirty"}-${pkgs.stdenv.hostPlatform.uname.processor}";
   isoImage.volumeID = lib.mkForce "NIXTV";
 
   environment.systemPackages = [ install ];

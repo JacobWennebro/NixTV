@@ -4,9 +4,10 @@ All notable changes to NixTV. Versions follow [Semantic Versioning](https://semv
 NixTV is 0.x, a minor version may change or remove options. Each release lists what to change
 in your `config.nix` under **Breaking**.
 
-## [0.1.0] - unreleased
+## [Unreleased]
 
-The first release. NixTV is early in development and hasn't been tested thoroughly.
+Changes waiting for the next release, which will be the first one (0.1.0). NixTV is early in
+development and hasn't been tested thoroughly.
 
 ### Added
 

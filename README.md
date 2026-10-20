@@ -84,7 +84,8 @@ connection, and about 30 minutes.
 ### With the NixTV installer (recommended)
 
 1. **Download the ISO** for your CPU from the [Releases](../../releases) page: `x86_64` for
-   most PCs, `aarch64` for ARM boxes. Check it with `sha256sum -c nixtv-*.iso.sha256`.
+   most PCs, `aarch64` for ARM boxes, e.g. `nixtv-0.1.0-x86_64.iso`. To check it, download
+   `SHA256SUMS` too and run `sha256sum -c SHA256SUMS --ignore-missing`.
 
    Or build it yourself on Linux with Nix: `nix build .#iso` in a clone (it ends up in `result/iso/`).
 2. **Write it to a USB stick** with [Fedora Media Writer](https://flathub.org/apps/org.fedoraproject.MediaWriter),
@@ -408,8 +409,9 @@ New apps should be off by default unless they're broadly useful and work without
 ### Releases
 
 Versions follow [SemVer](https://semver.org); while NixTV is 0.x, a minor bump may change
-options. Note changes in [`CHANGELOG.md`](CHANGELOG.md) as you make them, with option changes
-under **Breaking**. Pushing a tag builds both ISOs and publishes them as a GitHub release
+options. Note changes under **Unreleased** in [`CHANGELOG.md`](CHANGELOG.md) as you make them,
+with option changes under **Breaking**. When releasing, rename that section to the version and
+date (e.g. `[0.1.0] - 2026-10-25`). Pushing a tag builds both ISOs and publishes them as a GitHub release
 ([`.github/workflows/release.yml`](.github/workflows/release.yml)):
 
 ```bash
